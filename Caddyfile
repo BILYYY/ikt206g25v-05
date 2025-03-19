@@ -1,3 +1,4 @@
 ﻿bilyass.eu, http://64.226.98.59 {
     reverse_proxy web:8080
+    
 }
