@@ -1,7 +1,6 @@
 ﻿version: '3.8'
 
 services:
-  #  ASP.NET 
   web:
     build: .
     container_name: aspnet-app
@@ -12,12 +11,10 @@ services:
       ConnectionStrings__ProductionConnection: Host=db;Database=exampledb;Username=exampleuser;Password=examplepass
     depends_on:
       - db
-    networks:
-      - backend
+      - proxy
 
-  # PostgreSQL database container
   db:
-    image: postgres:16
+    image: postgres:16  # Consider switching to postgres:14 if issues persist
     container_name: postgres-db
     environment:
       POSTGRES_DB: exampledb
@@ -26,27 +23,16 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data  
-    networks:
-      - backend
+      - postgres_data:/var/lib/postgresql/data 
 
-  # Reverse proxy for HTTPS (Caddy)
   proxy:
     image: caddy:latest
     container_name: caddy-proxy
     ports:
-      - "80:80"   # HTTP traffic
+      - "80:80"   
       - "443:443" 
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile 
-    depends_on:
-      - web
-    networks:
-      - backend
+      - ./Caddyfile:/etc/caddy/Caddyfile # Caddy configuration
 
 volumes:
   postgres_data:
-
-networks:
-  backend:
-    driver: bridge
