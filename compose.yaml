@@ -1,7 +1,7 @@
 ﻿version: "3.8"
 
 services:
-  app:
+  app: # ilyass 
     build: .
     container_name: dotnet_app
     depends_on:
@@ -10,7 +10,7 @@ services:
     restart: always
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Host=db;Database=exampledb;Username=exampleuser;Password=examplepass
+      - ConnectionStrings__ProductionConnection=Host=db;Port=5432;Database=exampledb;Username=exampleuser;Password=MyStr0ng@Passw0rd!
     networks:
       - backend
     expose:
@@ -24,7 +24,7 @@ services:
     environment:
       POSTGRES_DB: exampledb
       POSTGRES_USER: exampleuser
-      POSTGRES_PASSWORD: examplepass
+      POSTGRES_PASSWORD: MyStr0ng@Passw0rd!
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
