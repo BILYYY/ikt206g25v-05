@@ -11,6 +11,14 @@ public class ApplicationDbContext : IdentityDbContext
     {
     }
 
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        
+        // You can add shared model configuration here
+        // No need to check provider type - each provider will handle appropriately
+    }
+
     public DbSet<Author> Authors => Set<Author>();
     public DbSet<Book> Books => Set<Book>();
     public DbSet<Review> Reviews => Set<Review>();

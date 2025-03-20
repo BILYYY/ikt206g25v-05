@@ -1,14 +1,18 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Example.Data;
+using Microsoft.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var connectionString = builder.Environment.IsDevelopment()
+// Determine environment and connection string
+var isDevelopment = builder.Environment.IsDevelopment();
+var connectionString = isDevelopment
     ? builder.Configuration.GetConnectionString("DefaultConnection")
     : builder.Configuration.GetConnectionString("ProductionConnection");
 
-if (builder.Environment.IsDevelopment())
+// Configure database context based on environment
+if (isDevelopment)
 {
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlite(connectionString));
@@ -19,6 +23,7 @@ else
         options.UseNpgsql(connectionString));
 }
 
+// Add Identity
 builder.Services.AddDefaultIdentity<IdentityUser>(options =>
         options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<ApplicationDbContext>();
@@ -27,42 +32,106 @@ builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
 
-// Apply Migrations and Seed Data
+// Configure the HTTP request pipeline
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Home/Error");
+    app.UseHsts();
+}
+
+// Apply database migrations and seed data
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
     try
     {
-        Console.WriteLine("Applying database migrations...");
-        dbContext.Database.Migrate();  // Ensure all migrations are applied
+        logger.LogInformation($"Environment: {app.Environment.EnvironmentName}");
+        logger.LogInformation($"Using connection string: {connectionString}");
+        logger.LogInformation($"Database Provider: {(isDevelopment ? "SQLite" : "PostgreSQL")}");
 
-        Console.WriteLine("Checking if Authors table exists...");
-        if (!dbContext.Authors.Any())  // Seed data only if Authors table is empty
+        // Check database connection
+        if (dbContext.Database.CanConnect())
         {
-            Console.WriteLine("Seeding database...");
-            ApplicationDbInitializer.Initialize(dbContext);
+            logger.LogInformation("Successfully connected to database");
         }
         else
         {
-            Console.WriteLine("Authors table already exists. Skipping seeding.");
+            logger.LogWarning("Cannot connect to database. Trying to create it...");
+        }
+
+        // Apply migrations or create database
+        if (isDevelopment)
+        {
+            // For SQLite, migrations are safer
+            logger.LogInformation("Applying migrations for SQLite...");
+            dbContext.Database.Migrate();
+        }
+        else
+        {
+            try
+            {
+                // For PostgreSQL in production, first try migrations
+                logger.LogInformation("Attempting to apply PostgreSQL migrations...");
+                dbContext.Database.Migrate();
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning($"Migration failed: {ex.Message}");
+                logger.LogInformation("Falling back to EnsureCreated for PostgreSQL...");
+                
+                // If migrations fail, try to create the database directly
+                dbContext.Database.EnsureCreated();
+            }
+        }
+
+        // Seed the database if empty
+        try
+        {
+            logger.LogInformation("Checking if data seeding is needed...");
+            // Use a direct SQL query to check if the Authors table exists and has data
+            var tableExists = false;
+            
+            if (isDevelopment)
+            {
+                // SQLite approach
+                var result = dbContext.Database.ExecuteSqlRaw(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='Authors'");
+                tableExists = result > 0;
+            }
+            else
+            {
+                // PostgreSQL approach
+                var result = dbContext.Database.ExecuteSqlRaw(
+                    "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'Authors')");
+                tableExists = result > 0;
+            }
+
+            if (!tableExists || !dbContext.Authors.Any())
+            {
+                logger.LogInformation("Seeding initial data...");
+                ApplicationDbInitializer.Initialize(dbContext);
+            }
+            else
+            {
+                logger.LogInformation("Database already contains data, skipping seed.");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error during data seeding");
         }
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"❌ Error during database migration or initialization: {ex.Message}");
+        logger.LogError(ex, "An error occurred during database initialization");
     }
-}
-
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHsts();
 }
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-
 app.UseAuthentication();
 app.UseAuthorization();
 
