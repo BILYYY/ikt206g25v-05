@@ -1,56 +1,15 @@
-﻿version: "3.8"
-
-services:
-  # .NET Application
-  app:
-    build: .
-    container_name: dotnet_app
-    depends_on:
-      - db
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Host=db;Database=mydatabase;Username=myuser;Password=mypassword
-    networks:
-      - backend
-    expose:
-      - "8080"  # Expose port 8080 to allow communication with other services
-  
-  # PostgreSQL Database
-  db:
-    image: postgres:16  # Use latest version of PostgreSQL
-    container_name: postgres_db
-    restart: always
-    environment:
-      POSTGRES_DB: mydatabase  # Database name
-      POSTGRES_USER: myuser  # Username for DB
-      POSTGRES_PASSWORD: mypassword  # Password for DB
-    volumes:
-      - postgres_data:/var/lib/postgresql/data  # Persistent data volume for PostgreSQL
-    networks:
-      - backend  # Use the backend network for communication with app
-  
-  # Caddy Reverse Proxy (for HTTPS)
-  caddy:
-    image: caddy:latest
-    container_name: caddy_proxy
-    restart: always
-    ports:
-      - "80:80"    # HTTP traffic (redirect to HTTPS)
-      - "443:443"  # HTTPS traffic
-    volumes:
-      - ./data:/data
-      - ./config:/config
-      - ./Caddyfile:/etc/caddy/Caddyfile  # Mount your Caddyfile for configuration
-    depends_on:
-      - app  # Ensure the app is up before Caddy
-    networks:
-      - backend  # Same backend network as other services for communication
-
-networks:
-  backend:
-    driver: bridge  # Define a bridge network for communication between services
-
-volumes:
-  postgres_data:  # Create a volume for PostgreSQL data storage
-  caddy_data:  # Create a volume for Caddy data storage
-  caddy_config:  # Create a volume for Caddy configuration storage
+﻿caddy:
+  image: caddy:latest
+  container_name: caddy_proxy
+  restart: always
+  ports:
+    - "80:80"    # HTTP traffic (redirect to HTTPS)
+    - "443:443"  # HTTPS traffic
+  volumes:
+    - caddy_data:/data
+    - caddy_config:/config
+    - ./Caddyfile:/etc/caddy/Caddyfile  # Mount your Caddyfile for configuration
+  depends_on:
+    - app  # Ensure the app is up before Caddy
+  networks:
+    - backend  # Same backend network as other services for communication
