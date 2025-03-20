@@ -30,17 +30,11 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    if (app.Environment.IsDevelopment())
-    {
-        dbContext.Database.EnsureCreated();
-        ApplicationDbInitializer.Initialize(dbContext);
-    }
-    else
-    {
-        dbContext.Database.Migrate();
-        ApplicationDbInitializer.Initialize(dbContext);
-    }
+    
+    dbContext.Database.Migrate();  // 🔹 Always apply migrations instead of EnsureCreated
+    ApplicationDbInitializer.Initialize(dbContext);
 }
+
 
 if (!app.Environment.IsDevelopment())
 {
