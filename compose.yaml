@@ -4,6 +4,9 @@ services:
   app:
     build: .
     container_name: dotnet_app
+    depends_on:
+      - db
+    restart: always
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Host=db;Database=mydatabase;Username=myuser;Password=mypassword
@@ -11,6 +14,7 @@ services:
       - backend
     expose:
       - "8080"
+    entrypoint: ["/bin/sh", "-c", "sleep 10 && dotnet Example.dll"]  # Wait 10 sec before running
 
   db:
     image: postgres:16
