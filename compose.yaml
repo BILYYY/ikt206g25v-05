@@ -5,30 +5,35 @@ services:
     build: .
     container_name: dotnet_app
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     restart: always
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Host=db;Database=mydatabase;Username=myuser;Password=mypassword
+      - ConnectionStrings__DefaultConnection=Host=db;Database=exampledb;Username=exampleuser;Password=examplepass
     networks:
       - backend
     expose:
       - "8080"
-    entrypoint: ["/bin/sh", "-c", "sleep 10 && dotnet Example.dll"]  # Wait 10 sec before running
+    entrypoint: ["/bin/sh", "-c", "sleep 10 && dotnet Example.dll"]
 
   db:
     image: postgres:16
     container_name: postgres_db
     restart: always
     environment:
-      POSTGRES_DB: exampledb  # Changed to match appsettings.json
-      POSTGRES_USER: exampleuser  # Changed to match appsettings.json
-      POSTGRES_PASSWORD: examplepass  # Changed to match appsettings.json
+      POSTGRES_DB: exampledb
+      POSTGRES_USER: exampleuser
+      POSTGRES_PASSWORD: examplepass
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - backend
-
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exampleuser -d exampledb"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
 
   caddy:
     image: caddy:latest
