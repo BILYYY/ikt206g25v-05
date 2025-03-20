@@ -47,85 +47,97 @@ using (var scope = app.Services.CreateScope())
 
     try
     {
-        logger.LogInformation($"Environment: {app.Environment.EnvironmentName}");
-        logger.LogInformation($"Using connection string: {connectionString}");
-        logger.LogInformation($"Database Provider: {(isDevelopment ? "SQLite" : "PostgreSQL")}");
+        logger.LogInformation("Environment: {Environment}", app.Environment.EnvironmentName);
+        logger.LogInformation("Database provider: {Provider}", dbContext.Database.ProviderName);
+        logger.LogInformation("Using connection string: {ConnectionString}", connectionString);
 
         // Check database connection
-        if (dbContext.Database.CanConnect())
+        try
         {
-            logger.LogInformation("Successfully connected to database");
+            if (dbContext.Database.CanConnect())
+            {
+                logger.LogInformation("Successfully connected to database");
+            }
+            else
+            {
+                logger.LogWarning("Cannot connect to database. Will attempt to create it.");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            logger.LogWarning("Cannot connect to database. Trying to create it...");
+            logger.LogWarning("Error checking database connection: {Message}", ex.Message);
         }
 
-        // Apply migrations or create database
+        // Handle database creation/migration
         if (isDevelopment)
         {
-            // For SQLite, migrations are safer
-            logger.LogInformation("Applying migrations for SQLite...");
+            // For SQLite in development
+            logger.LogInformation("Development environment: Using migrations for SQLite");
             dbContext.Database.Migrate();
         }
         else
         {
+            // For PostgreSQL in production, use EnsureCreated for reliability
+            logger.LogInformation("Production environment: Creating database schema directly");
+            
             try
             {
-                // For PostgreSQL in production, first try migrations
-                logger.LogInformation("Attempting to apply PostgreSQL migrations...");
-                dbContext.Database.Migrate();
+                // First try EnsureCreated which is more reliable across provider changes
+                dbContext.Database.EnsureCreated();
+                logger.LogInformation("Database schema created successfully");
             }
             catch (Exception ex)
             {
-                logger.LogWarning($"Migration failed: {ex.Message}");
-                logger.LogInformation("Falling back to EnsureCreated for PostgreSQL...");
-                
-                // If migrations fail, try to create the database directly
-                dbContext.Database.EnsureCreated();
+                logger.LogError(ex, "Failed to create database schema");
+                throw; // Re-throw to prevent app from starting with a broken database
             }
         }
 
-        // Seed the database if empty
+        // Handle data seeding
         try
         {
-            logger.LogInformation("Checking if data seeding is needed...");
-            // Use a direct SQL query to check if the Authors table exists and has data
-            var tableExists = false;
+            logger.LogInformation("Checking if data seeding is needed");
             
-            if (isDevelopment)
+            // Try to query Authors table to see if it exists and has data
+            bool hasData = false;
+            
+            try
             {
-                // SQLite approach
-                var result = dbContext.Database.ExecuteSqlRaw(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name='Authors'");
-                tableExists = result > 0;
+                // Simple check to see if we can get data
+                hasData = dbContext.Authors.Any();
+                logger.LogInformation("Authors table exists and has data: {HasData}", hasData);
             }
-            else
+            catch (Exception ex)
             {
-                // PostgreSQL approach
-                var result = dbContext.Database.ExecuteSqlRaw(
-                    "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'Authors')");
-                tableExists = result > 0;
+                logger.LogWarning("Error checking Authors table: {Message}", ex.Message);
+                logger.LogInformation("Assuming Authors table is empty or doesn't exist");
             }
-
-            if (!tableExists || !dbContext.Authors.Any())
+            
+            if (!hasData)
             {
-                logger.LogInformation("Seeding initial data...");
+                logger.LogInformation("Seeding initial data");
                 ApplicationDbInitializer.Initialize(dbContext);
+                logger.LogInformation("Data seeding completed successfully");
             }
             else
             {
-                logger.LogInformation("Database already contains data, skipping seed.");
+                logger.LogInformation("Database already contains data, skipping seed");
             }
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Error during data seeding");
+            // Continue application startup even if seeding fails
         }
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "An error occurred during database initialization");
+        logger.LogError(ex, "Database initialization failed");
+        // In production, this would prevent the app from starting with a broken database
+        if (!isDevelopment)
+        {
+            throw; // Re-throw in production to prevent app from starting with DB issues
+        }
     }
 }
 
@@ -142,4 +154,3 @@ app.MapControllerRoute(
 app.MapRazorPages();
 
 app.Run();
-//llgsdsa
