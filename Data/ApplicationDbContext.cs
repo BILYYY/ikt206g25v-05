@@ -11,7 +11,7 @@ public class ApplicationDbContext : IdentityDbContext
     {
     }
 
-    public DbSet<Author> Authors => Set<Author>();
-    public DbSet<Book> Books => Set<Book>();
-    public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<Author> Authors { get; set; } = null!;
+    public DbSet<Book> Books { get; set; } = null!;
+    public DbSet<Review> Reviews { get; set; } = null!;
 }

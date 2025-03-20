@@ -19,7 +19,7 @@ else
         options.UseNpgsql(connectionString));
 }
 
-builder.Services.AddDefaultIdentity<IdentityUser>(options => 
+builder.Services.AddDefaultIdentity<IdentityUser>(options =>
         options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<ApplicationDbContext>();
 
@@ -27,14 +27,32 @@ builder.Services.AddControllersWithViews();
 
 var app = builder.Build();
 
+// Apply Migrations and Seed Data
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    
-    dbContext.Database.Migrate();  // 🔹 Always apply migrations instead of EnsureCreated
-    ApplicationDbInitializer.Initialize(dbContext);
-}
 
+    try
+    {
+        Console.WriteLine("Applying database migrations...");
+        dbContext.Database.Migrate();  // Ensure all migrations are applied
+
+        Console.WriteLine("Checking if Authors table exists...");
+        if (!dbContext.Authors.Any())  // Seed data only if Authors table is empty
+        {
+            Console.WriteLine("Seeding database...");
+            ApplicationDbInitializer.Initialize(dbContext);
+        }
+        else
+        {
+            Console.WriteLine("Authors table already exists. Skipping seeding.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"❌ Error during database migration or initialization: {ex.Message}");
+    }
+}
 
 if (!app.Environment.IsDevelopment())
 {
